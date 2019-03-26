@@ -46,6 +46,50 @@ function callPUTService {
     curl -L -X PUT -H "${API_KEY}" -H "${HEADER_ACCEPT}" -H "${HEADER_CONTENT_TYPE}" "${BASE_URL}${uri}" --data-binary "${json}" 2> /dev/null > "${COMM_FILE}"
 }
 
+function getHelp {
+	echo "$0 [action] [options]"
+	echo ""
+	echo "ACTION"
+	echo ""
+	echo "     getorgs"
+	echo "          Returns a list of Organizations that the provided API Key has access to."
+	echo ""
+	echo "     getnets"
+	echo "          Returns a list of Networks configured in the provided Organization."
+	echo "          Used together with -O, --organization"
+	echo ""
+	echo "     getdevs"
+	echo "          Returns a list of Devices configured in the provided Network."
+	echo "          Used together with -N, --network"
+	echo ""
+	echo "     newnet <\"network name\">"
+	echo "          Create a new network in a given Organization."
+	echo "          Used together with -O, --organization"
+	echo ""
+	echo "     newdev <serial-number>"
+	echo "          Claim a device into a given Network."
+	echo "          Used together with -N, --network"
+	echo ""
+	echo "     setssid <\"ssid name\">"
+	echo "          Configures a SSID for PSK with a provided Pre-Shared Key."
+	echo "          Used together with -N, --network and -P, --psk"
+	echo ""
+	echo "OPTIONS"
+	echo ""
+	echo "     -O, --organization"
+	echo "          Specify the Organization to apply the action to."
+	echo ""
+	echo "     -N, --network"
+	echo "          Specify the Network to apply the action to."
+	echo ""
+	echo "     -D, --device"
+	echo "          Specify the Device to apply the action to."
+	echo ""
+	echo "     -P, --psk"
+	echo "          Specify the PSK to use when configuring a SSID."
+	echo ""
+}
+
 # get all organizations
 function getOrgs {
     callGETService "/organizations"
@@ -151,6 +195,8 @@ function setSsid {
 if [ $# -eq 0 ]
   then
     echo "No arguments supplied"
+    echo ""
+    getHelp
   else
     POSITIONAL=()
     while [[ $# -gt 0 ]]
@@ -178,6 +224,10 @@ if [ $# -eq 0 ]
           shift # past argument
           shift # past value
           ;;
+          -?|--help)
+		  getHelp
+		  shift
+          ;;
           --default)
           DEFAULT=YES
           shift # past argument
@@ -190,11 +240,11 @@ if [ $# -eq 0 ]
     done
     set -- "${POSITIONAL[@]}" # restore positional parameters
 
-    echo ORGANIZATION    = "${ORGANIZATION}"
-    echo NETWORK         = "${NETWORK}"
-    echo DEVICE          = "${DEVICE}"
-    echo PSK             = "${PSK}"
-	echo ""
+#     echo ORGANIZATION    = "${ORGANIZATION}"
+#     echo NETWORK         = "${NETWORK}"
+#     echo DEVICE          = "${DEVICE}"
+#     echo PSK             = "${PSK}"
+# 	echo ""
   
     case $1 in
     	getorgs)
