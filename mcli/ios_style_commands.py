@@ -275,7 +275,7 @@ class IOSCmdLine(CmdLine):
         raise SystemExit
 
     def do_show(self, arg):
-        "Show system information"
+        """Show dashboard information ['organizations', 'networks', 'devices', 'inventory']"""
         global orglist
 
         fullcmdlist = [
@@ -310,7 +310,7 @@ class IOSCmdLine(CmdLine):
             print_data(build_netorgdev_list(newarg))
 
     def do_organization(self, arg):
-        "Enter context: organization"
+        """Enter context: organization"""
         global orglist
         global curorg
         global netlist
@@ -473,11 +473,11 @@ class IOSCmdLineOrg(CmdLine):
     #         print("delete network", newarg)
 
     def do_show(self, arg):
-        "Show system information"
+        """Show dashboard information ['networks', 'configuration']"""
         global netlist
 
         fullcmdlist = [
-            ('network', 'show networks'),
+            ('networks', 'show networks'),
             ('configuration', 'show configuration'),
         ]
         shortcmdlist = []
@@ -496,7 +496,7 @@ class IOSCmdLineOrg(CmdLine):
         else:
             newarg = ""
 
-        if usedcmd == "network":
+        if usedcmd == "networks":
             print_data(build_net_list(newarg))
 
         if usedcmd == "configuration":
@@ -509,7 +509,7 @@ class IOSCmdLineOrg(CmdLine):
             print(cfg)
 
     def do_network(self, arg):
-        "Enter context: network"
+        """Enter context: network"""
         global orglist
         global netlist
         global curorg
@@ -596,11 +596,11 @@ class IOSCmdLineNet(CmdLine):
         i.cmdloop()
 
     def do_show(self, arg):
-        "Show network information"
+        """Show dashboard information ['devices', 'configuration']"""
         global devlist
 
         fullcmdlist = [
-            ('device', 'show devices'),
+            ('devices', 'show devices'),
             ('configuration', 'show configuration'),
         ]
         shortcmdlist = []
@@ -619,7 +619,7 @@ class IOSCmdLineNet(CmdLine):
         else:
             newarg = ""
 
-        if usedcmd == "device":
+        if usedcmd == "devices":
             print_data(build_dev_list(newarg))
 
         if usedcmd == "configuration":
@@ -726,7 +726,7 @@ class IOSCmdLineDev(CmdLine):
         i.cmdloop()
 
     def do_show(self, arg):
-        "Show device information"
+        """Show dashboard information ['interfaces', 'configuration']"""
         global devlist
 
         fullcmdlist = [
@@ -766,7 +766,7 @@ class IOSCmdLineDev(CmdLine):
             print(cfg)
 
     def do_interface(self, arg):
-        "Enter context: interface"
+        """Enter context: interface"""
         global orglist
         global netlist
         global devlist
@@ -871,7 +871,7 @@ class IOSCmdLineIntSSID(CmdLine):
         # print(r)
 
     def do_show(self, arg):
-        """Show device information"""
+        """Show dashboard information ['configuration']"""
         global devlist
 
         fullcmdlist = [
