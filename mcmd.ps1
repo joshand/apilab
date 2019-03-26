@@ -1,11 +1,16 @@
 [CmdletBinding()]
 Param (
-    [string] $action,
     [string] $name,
     [string] $organization,
     [string] $network,
     [string] $device,
     [string] $psk,
+    [switch] $getorgs = $false,
+    [switch] $getnets = $false,
+    [switch] $getdevs = $false,
+    [string] $newnet = $false,
+    [string] $newdev = $false,
+    [string] $setssid = $false,
     [switch] $help = $false
 )
 
@@ -13,7 +18,7 @@ New-Variable -Scope global -Name headers
 $global:headers = @{
 	"Content-Type" = "application/json"
 	"Accept" = "application/json"
-	"X-Cisco-Meraki-API-Key" = "abcdefghijklmnopqrstuvwxyz0123456789csco"
+	"X-Cisco-Meraki-API-Key" = "bce348a3002d7d58b2c723fb0cb00bd99f02ca88"
 }
 New-Variable -Scope global -Name base_url
 $global:base_url = "https://api.meraki.com/api/v0"
@@ -92,32 +97,32 @@ function find308dest {
 }
 
 function getHelp {
-	Write-Host "powershell -file mcmd.ps1 -action (action) [-name (name)] [options]"
+	Write-Host "powershell -file mcmd.ps1 -action [name] [options]"
 	Write-Host ""
-	Write-Host "ACTION (-action)"
+	Write-Host "ACTION"
 	Write-Host ""
-	Write-Host "     getorgs"
+	Write-Host "     -getorgs"
 	Write-Host "          Returns a list of Organizations that the provided API Key has access to."
 	Write-Host ""
-	Write-Host "     getnets"
+	Write-Host "     -getnets"
 	Write-Host "          Returns a list of Networks configured in the provided Organization."
 	Write-Host "          Used together with -organization"
 	Write-Host ""
-	Write-Host "     getdevs"
+	Write-Host "     -getdevs"
 	Write-Host "          Returns a list of Devices configured in the provided Network."
 	Write-Host "          Used together with -network"
 	Write-Host ""
-	Write-Host "     newnet -name ""network name"""
+	Write-Host "     -newnet ""network name"""
 	Write-Host "          Create a new network in a given Organization."
 	Write-Host "          Used together with -organization"
 	Write-Host ""
-	Write-Host "     newdev -name serial-number"
+	Write-Host "     -newdev serial-number"
 	Write-Host "          Claim a device into a given Network."
 	Write-Host "          Used together with -network"
 	Write-Host ""
-	Write-Host "     setssid -name ""ssid name"""
+	Write-Host "     -setssid ""ssid name"""
 	Write-Host "          Configures a SSID for PSK with a provided Pre-Shared Key."
-	Write-Host "          Used together with -network and -P, --psk"
+	Write-Host "          Used together with -network and -psk"
 	Write-Host ""
 	Write-Host "OPTIONS"
 	Write-Host ""
@@ -237,15 +242,18 @@ function setSsid {
 	}
 }
 
-if ($help -eq $true) {
+If ($help -eq $true) {
 	getHelp
-} else {
-	switch ($action) {
-		"getorgs" {getOrgs; break}
-		"getnets" {getNets $organization; break}
-		"getdevs" {getDevs $network; break}
-		"newnet" {newNet $name $organization; break}
-		"newdev" {newDev $name $network; break}
-		"setssid" {setSsid $name $network $psk; break}
-	}
+} ElseIf ($getorgs -eq $true) {
+	getOrgs
+} ElseIf ($getnets -eq $true) {
+	getNets $organization
+} ElseIf ($getdevs -eq $true) {
+	getDevs $network
+} ElseIf ($newnet -ne $false) {
+	newNet $newnet $organization
+} ElseIf ($newdev -ne $false) {
+	newDev $newdev $network
+} ElseIf ($setssid -ne $false) {
+	setSsid $setssid $network $psk
 }
