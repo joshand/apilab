@@ -93,12 +93,6 @@ function getHelp {
 # get all organizations
 function getOrgs {
     callGETService "/organizations"
-	# jq doesn't work because it doesn't process large numbers correctly
-#     local c=`jq length $COMM_FILE`
-#     for ((i=0;i<=c-1;i++)); do
-# 	    local d=`jq '.['"$i"'] | .id,.name' $COMM_FILE`
-# 	    echo "*" ${d}
-# 	done
 
 	local c=`cat $COMM_FILE`
 	IFS='%'
@@ -106,37 +100,58 @@ function getOrgs {
 
 	for x in $arr
 	do
-		# add quotes to orgid json
+		# add quotes to org json
 		orgjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
 		# parse json to get id and name
 		orgid=$( echo $orgjson | grep -o '"id": *"[^"]*"' | grep -o '"[^"]*"$' )
 		orgname=$( echo $orgjson | grep -o '"name": *"[^"]*"' | grep -o '"[^"]*"$' )
 		echo "*" $orgid $orgname
 	done
+	
+	unset IFS
 }
 
 # get all networks
 function getNets {
     callGETService "/organizations/$1/networks"
-    local c=`jq length $COMM_FILE`
-    for ((i=0;i<=c-1;i++)); do
-	    local d=`jq '.['"$i"'] | .id,.name' $COMM_FILE`
-	    local d=${d/\"/}
-	    local d=${d/\"/}
-	    echo "*" ${d}
+
+	local c=`cat $COMM_FILE`
+	IFS='%'
+	arr=$(echo $c | sed 's/},{/}%{/g' | tr -d "[]")
+
+	for x in $arr
+	do
+		# add quotes to net json
+		netjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
+		# parse json to get id and name
+		netid=$( echo $netjson | grep -o '"id": *"[^"]*"' | grep -o '"[^"]*"$' )
+		netname=$( echo $netjson | grep -o '"name": *"[^"]*"' | grep -o '"[^"]*"$' )
+		echo "*" $netid $netname
 	done
+	
+	unset IFS
 }
 
 # get all devices
 function getDevs {
     callGETService "/networks/$1/devices"
-    local c=`jq length $COMM_FILE`
-    for ((i=0;i<=c-1;i++)); do
-	    local d=`jq '.['"$i"'] | .serial,.model,.name // .mac' $COMM_FILE`
-	    local d=${d/\"/}
-	    local d=${d/\"/}
-	    echo "*" ${d}
+
+	local c=`cat $COMM_FILE`
+	IFS='%'
+	arr=$(echo $c | sed 's/},{/}%{/g' | tr -d "[]")
+
+	for x in $arr
+	do
+		# add quotes to dev json
+		devjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
+		# parse json to get id and name
+		devsn=$( echo $devjson | grep -o '"serial": *"[^"]*"' | grep -o '"[^"]*"$' )
+		devmodel=$( echo $devjson | grep -o '"model": *"[^"]*"' | grep -o '"[^"]*"$' )
+		devmac=$( echo $devjson | grep -o '"mac": *"[^"]*"' | grep -o '"[^"]*"$' )
+		echo "*" $devsn $devmodel $devmac
 	done
+	
+	unset IFS
 }
 
 # add network
@@ -144,7 +159,12 @@ function newNet {
 	local name=$2
 	local json='{"name": "'${name}'", "timeZone": "Etc/GMT", "type": "switch appliance wireless"}'
     callPOSTService "/organizations/$1/networks" "${json}"
-    local dtmp=`jq '.id' $COMM_FILE`
+
+	local x=`cat $COMM_FILE`
+	# add quotes to net json
+	netjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
+	dtmp=$( echo $netjson | grep -o '"id": *"[^"]*"' | grep -o '"[^"]*"$' )
+
     local d=`echo $dtmp | cut -d' ' -f1 | sed 's/"//g'`
     if [ -z "$d" ]; then
     	cat $COMM_FILE
@@ -162,8 +182,12 @@ function newDev {
 	local sn=$2
 	local json='{"serial": "'${sn}'"}'
     callPOSTService "/networks/$1/devices/claim" "${json}"
-    # local d=`jq '.id' $COMM_FILE`
-    local stmp=`jq '.httpstatus' $COMM_FILE`
+
+	local x=`cat $COMM_FILE`
+	# add quotes to net json
+	devjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
+	stmp=$( echo $devjson | grep -o '"httpstatus": *"[^"]*"' | grep -o '"[^"]*"$' )
+
     local s=`echo $stmp | cut -d' ' -f2 | sed 's/"//g'`
     if [ $s != "200" ]; then
     	cat $COMM_FILE
@@ -179,7 +203,12 @@ function setSsid {
 	local psk=$3
 	local json='{"name": "'${name}'", "enabled": true, "authMode": "psk", "encryptionMode": "wpa", "wpaEncryptionMode": "WPA2 only", "psk": "'${psk}'"}'
     callPUTService "/networks/$1/ssids/0" "${json}"
-    local dtmp=`jq '.number' $COMM_FILE`
+    
+    local x=`cat $COMM_FILE`
+	# add quotes to net json
+	ssidjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
+	dtmp=$( echo $ssidjson | grep -o '"number": *"[^"]*"' | grep -o '"[^"]*"$' )
+
     local d=`echo $dtmp | cut -d' ' -f1 | sed 's/"//g'`
     if [ -z "$d" ]; then
     	cat $COMM_FILE
