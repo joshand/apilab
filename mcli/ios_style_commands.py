@@ -4,6 +4,7 @@ from cmd_ios_style import *
 from operator import itemgetter
 import itertools, sys
 import meraki
+import os
 
 netorglist = []
 orglist = []
@@ -903,9 +904,9 @@ class IOSCmdLineIntSSID(CmdLine):
             else:
                 cfg += " shut\n"
             cfg += " authMode " + r["authMode"] + "\n"
-            cfg += " encryptionMode " + r["encryptionMode"] + "\n"
-            cfg += " wpaEncryptionMode " + r["wpaEncryptionMode"] + "\n"
-            cfg += " psk " + r["psk"] + "\n"
+            cfg += " encryptionMode " + r.get("encryptionMode","") + "\n"
+            cfg += " wpaEncryptionMode " + r.get("wpaEncryptionMode","") + "\n"
+            cfg += " psk " + r.get("psk","") + "\n"
             cfg += " splashPage " + r["splashPage"] + "\n"
             cfg += " ssidAdminAccessible " + str(r["ssidAdminAccessible"]) + "\n"
             cfg += " ipAssignmentMode " + r["ipAssignmentMode"] + "\n"
@@ -934,6 +935,12 @@ class IOSCmdLineIntSSID(CmdLine):
 
 
 if __name__ == '__main__':
+    bot_app_name = os.getenv("MERAKI_API_TOKEN")
+
+    if not bot_app_name:
+        merakiaddon.meraki_api_token = input("Please enter your Meraki API Token:")
+        merakiaddon.header = {"X-Cisco-Meraki-API-Key": merakiaddon.meraki_api_token}
+
     cmdLine = IOSCmdLine()
     cmdLine.params = Command("show", [])
     cmdLine.cmdloop()

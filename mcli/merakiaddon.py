@@ -23,10 +23,16 @@ import meraki
 meraki_client_to = os.getenv("MERAKI_CLIENT_TIMESPAN")
 if not meraki_client_to:
     meraki_client_to = "86400"
-meraki_api_token = os.getenv("MERAKI_API_TOKEN")
+env_token = os.getenv("MERAKI_API_TOKEN")
+if env_token:
+    meraki_api_token = env_token
+else:
+    meraki_api_token = ""
+
 meraki_over_dash = os.getenv("MERAKI_OVERRIDE_DASHBOARD")
 #meraki_dashboard_map = os.getenv("MERAKI_DASHBOARD_MAP")       -- removed: enabled link generation at run-time --
 header = {"X-Cisco-Meraki-API-Key": meraki_api_token}
+
 
 # ========================================================
 # Initialize Program - Function Definitions
