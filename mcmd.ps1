@@ -18,7 +18,7 @@ New-Variable -Scope global -Name headers
 $global:headers = @{
 	"Content-Type" = "application/json"
 	"Accept" = "application/json"
-	"X-Cisco-Meraki-API-Key" = "bce348a3002d7d58b2c723fb0cb00bd99f02ca88"
+	"X-Cisco-Meraki-API-Key" = "abcdefghijklmnopqrstuvwxyz0123456789csco"
 }
 New-Variable -Scope global -Name base_url
 $global:base_url = "https://api.meraki.com/api/v0"
