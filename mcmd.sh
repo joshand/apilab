@@ -2,7 +2,7 @@
 
 HEADER_CONTENT_TYPE="Content-Type: application/json"
 HEADER_ACCEPT="Accept: application/json"
-API_KEY="X-Cisco-Meraki-API-Key: abcdefghijklmnopqrstuvwxyz0123456789csco"
+API_KEY="X-Cisco-Meraki-API-Key: dc440e9ebf03a0935469cb586952c0448234d9d3"
 BASE_URL="https://dashboard.meraki.com/api/v0"
 COMM_FILE="/tmp/rest.json"
 CURL_FILE="/tmp/curl.out"
@@ -42,7 +42,7 @@ function callPUTService {
     fi
 
     echo "Calling URI (PUT):" ${uri}
-    curl -L -X PUT -H "${API_KEY}" -H "${HEADER_ACCEPT}" -H "${HEADER_CONTENT_TYPE}" "${BASE_URL}${uri}" --data-binary "${json}" 2> /dev/null > "${COMM_FILE}"
+    curl --write-out '{"httpstatus":"%{http_code}"}' -L -X PUT -H "${API_KEY}" -H "${HEADER_ACCEPT}" -H "${HEADER_CONTENT_TYPE}" "${BASE_URL}${uri}" --data-binary "${json}" 2> /dev/null > "${COMM_FILE}"
 }
 
 function getHelp {
@@ -69,9 +69,29 @@ function getHelp {
 	echo "          Claim a device into a given Network."
 	echo "          Used together with -N, --network"
 	echo ""
+	echo "     newwhd <\"destination-url\">"
+	echo "          Creates a new Webhook Destination; Returns the Webhook ID."
+	echo "          Used together with -N, --network"
+	echo ""
+	echo "     setwhalert <\"webhook-id\">"
+	echo "          Enable Configuration Change Alerts for a Webhook with the provided ID."
+	echo "          Used together with -N, --network"
+	echo ""
 	echo "     setssid <\"ssid name\">"
-	echo "          Configures a SSID for PSK with a provided Pre-Shared Key."
+	echo "          Configures the first SSID for PSK with a provided Pre-Shared Key."
 	echo "          Used together with -N, --network and -P, --psk"
+	echo ""
+	echo "     setssiddns"
+	echo "          Configures the Layer 3 Firewall for the first SSID to allow only Umbrella DNS."
+	echo "          Used together with -N, --network"
+	echo ""
+	echo "     setporttag <\"tag name\">"
+	echo "          Sets a tag on a specfied switch port."
+	echo "          Used together with -D, --device and -R, --port"
+	echo ""
+	echo "     setportvlan <\"vlan number\">"
+	echo "          Sets a VLAN on a specfied switch port."
+	echo "          Used together with -D, --device and -R, --port"
 	echo ""
 	echo "OPTIONS"
 	echo ""
@@ -86,6 +106,9 @@ function getHelp {
 	echo ""
 	echo "     -P, --psk"
 	echo "          Specify the PSK to use when configuring a SSID."
+	echo ""
+	echo "     -R, --port"
+	echo "          Specify the Port to use when configuring a switch port."
 	echo ""
 }
 
@@ -196,6 +219,89 @@ function newDev {
 	fi
 }
 
+# add webhook destination
+function newWebhookDest {
+	local whd=$2
+	local json='{"name": "Webhook", "sharedSecret": "", "url": "'${whd}'"}'
+    callPOSTService "/networks/$1/httpServers" "${json}"
+
+	local x=`cat $COMM_FILE`
+	# add quotes to net json
+	netjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
+	dtmp=$( echo $netjson | grep -o '"id": *"[^"]*"' | grep -o '"[^"]*"$' )
+
+    local d=`echo $dtmp | cut -d' ' -f1 | sed 's/"//g'`
+    if [ -z "$d" ]; then
+    	cat $COMM_FILE
+    	echo ""
+    elif [ $d = "null" ]; then
+    	cat $COMM_FILE
+    	echo ""
+    else
+		echo "New webhook destination" $d "created."
+	fi
+}
+
+# set webhook alert for config changes
+function setWebhook {
+	local wh=$2
+	local json='{"defaultDestinations": {"httpServerIds": ["'${wh}'"]}, "alerts": [{"type": "settingsChanged", "enabled": true}]}'
+    callPUTService "/networks/$1/alertSettings" "${json}"
+
+	local x=`cat $COMM_FILE`
+	# add quotes to net json
+	devjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
+	stmp=$( echo $devjson | grep -o '"httpstatus": *"[^"]*"' | grep -o '"[^"]*"$' )
+
+    local s=`echo $stmp | cut -d' ' -f2 | sed 's/"//g'`
+    if [ $s != "200" ]; then
+    	cat $COMM_FILE
+    	echo ""
+    else
+		echo "Configuration update alerts enabled for webhook" $wh "."
+	fi
+}
+
+# configure tag on switch port
+function setPortTag {
+	local tags=$2
+	local json='{"tags": "'${tags}'"}'
+    callPUTService "/devices/$1/switchPorts/$3" "${json}"
+    
+    local x=`cat $COMM_FILE`
+	# add quotes to net json
+	devjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
+	stmp=$( echo $devjson | grep -o '"httpstatus": *"[^"]*"' | grep -o '"[^"]*"$' )
+
+    local s=`echo $stmp | cut -d' ' -f2 | sed 's/"//g'`
+    if [ $s != "200" ]; then
+    	cat $COMM_FILE
+    	echo ""
+    else
+		echo "Tag" $tags "added to port $3."
+	fi
+}
+
+# configure vlan on switch port
+function setPortVlan {
+	local vlan=$2
+	local json='{"type": "access", "voiceVlan": "", "vlan": "'${vlan}'"}'
+    callPUTService "/devices/$1/switchPorts/$3" "${json}"
+    
+    local x=`cat $COMM_FILE`
+	# add quotes to net json
+	devjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
+	stmp=$( echo $devjson | grep -o '"httpstatus": *"[^"]*"' | grep -o '"[^"]*"$' )
+
+    local s=`echo $stmp | cut -d' ' -f2 | sed 's/"//g'`
+    if [ $s != "200" ]; then
+    	cat $COMM_FILE
+    	echo ""
+    else
+		echo "Port $3 set as Access VLAN $vlan."
+	fi
+}
+
 # configure SSID
 function setSsid {
 	local name=$2
@@ -217,6 +323,25 @@ function setSsid {
     	echo ""
     else
 		echo "SSID" "'"$2"'" "configured."
+	fi
+}
+
+# configure SSID L3 FW to only allow Umbrella DNS
+function setSsidDns {
+	local json='{"rules": [{"comment": "Allow Umbrella DNS", "policy": "allow", "protocol": "udp", "destPort": "53", "destCidr": "208.67.222.222/32"}, {"comment": "Allow Umbrella DNS", "policy": "allow", "protocol": "udp", "destPort": "53", "destCidr": "208.67.220.220/32"}, {"comment": "Block Other DNS", "policy": "deny", "protocol": "udp", "destPort": "53", "destCidr": "any"}]}'
+    callPUTService "/networks/$1/ssids/0/l3FirewallRules" "${json}"
+    
+    local x=`cat $COMM_FILE`
+	# add quotes to net json
+	devjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
+	stmp=$( echo $devjson | grep -o '"httpstatus": *"[^"]*"' | grep -o '"[^"]*"$' )
+
+    local s=`echo $stmp | cut -d' ' -f2 | sed 's/"//g'`
+    if [ $s != "200" ]; then
+    	cat $COMM_FILE
+    	echo ""
+    else
+		echo "DNS Restrictions set on SSID."
 	fi
 }
 
@@ -249,6 +374,11 @@ if [ $# -eq 0 ]
           ;;
           -P|--psk)
           PSK="$2"
+          shift # past argument
+          shift # past value
+          ;;
+          -R|--port)
+          PORT="$2"
           shift # past argument
           shift # past value
           ;;
@@ -290,8 +420,23 @@ if [ $# -eq 0 ]
     	newdev)
 		    newDev "${NETWORK}" "$2"
 		    ;;
+    	newwhd)
+		    newWebhookDest "${NETWORK}" "$2"
+		    ;;
+    	setwhalert)
+		    setWebhook "${NETWORK}" "$2"
+		    ;;
     	setssid)
 		    setSsid "${NETWORK}" "$2" "${PSK}"
+		    ;;
+    	setssiddns)
+		    setSsidDns "${NETWORK}"
+		    ;;
+    	setporttag)
+		    setPortTag "${DEVICE}" "$2" "${PORT}"
+		    ;;
+    	setportvlan)
+		    setPortVlan "${DEVICE}" "$2" "${PORT}"
 		    ;;
 		*)
 		    echo "Invalid arguments"
