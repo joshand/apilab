@@ -20,6 +20,8 @@ intlist = []
 curint = []
 # current_org = 0
 # current_net = 0
+shortioscmdlistintswitch = []
+shortioscmdlistint = []
 
 def xstr(s):
     return '' if s is None else str(s)
@@ -253,6 +255,10 @@ def resolve_arg(arg, datalist):
         for y in x:
             if y == arg:
                 retval = x
+                break
+
+        if retval:
+            break
 
     if retval is None:
         if isinstance(arg, int) and arg < len(datalist):
@@ -580,7 +586,7 @@ class IOSCmdLineOrg(CmdLine):
 # --------------------
 class IOSCmdLineNet(CmdLine):
     global shortioscmdlistnet
-    shortioscmdlistnet = ["show", "device", "quit", "end"]
+    shortioscmdlistnet = ["show", "device", "quit", "end", "webhookserver", "alert"]
 
     def __init__(self):
         CmdLine.__init__(self)
@@ -595,6 +601,28 @@ class IOSCmdLineNet(CmdLine):
         i.prompt = "#"
         i.params = Command("show", [])
         i.cmdloop()
+
+    def do_webhookserver(self, arg):
+        """Set Webhook HTTP Server"""
+        global curnet
+        if isinstance(arg, list):
+            http_server = arg[0]
+        else:
+            http_server = arg
+
+        r = merakiaddon.addhttpserver(merakiaddon.meraki_api_token, curnet[1], http_server, suppressprint=True)
+        if "id" in r:
+            r = merakiaddon.sethttpserverdefaultalert(merakiaddon.meraki_api_token, curnet[1], r["id"], suppressprint=True)
+
+    def do_alert(self, arg):
+        """Set status of specific alert ['settingsChanged']"""
+        global curnet
+        if isinstance(arg, list):
+            alert_type = arg[0]
+        else:
+            alert_type = arg
+
+        r = merakiaddon.setalertstatus(merakiaddon.meraki_api_token, curnet[1], alert_type, suppressprint=True)
 
     def do_show(self, arg):
         """Show dashboard information ['devices', 'configuration']"""
@@ -625,6 +653,7 @@ class IOSCmdLineNet(CmdLine):
 
         if usedcmd == "configuration":
             r = meraki.getnetworkdetail(merakiaddon.meraki_api_token, curnet[1], suppressprint=True)
+            r2 = merakiaddon.gethttpservers(merakiaddon.meraki_api_token, curnet[1], suppressprint=True)
             cfg = "network " + r["id"] + "\n"
             cfg += " name " + r["name"] + "\n"
             cfg += " type " + r["type"] + "\n"
@@ -633,6 +662,13 @@ class IOSCmdLineNet(CmdLine):
             cfg += " disableMyMerakiCom " + str(r["disableMyMerakiCom"]) + "\n"
             cfg += " disableRemoteStatusPage " + str(r["disableRemoteStatusPage"]) + "\n"
             cfg += " organizationId " + str(r["organizationId"]) + "\n"
+
+            for wh in r2:
+                cfg += " webhook " + wh["id"] + "\n"
+                cfg += "  name " + wh["name"] + "\n"
+                cfg += "  url " + wh["url"] + "\n"
+                cfg += "  sharedSecret " + wh["sharedSecret"] + "\n"
+
             print(cfg)
 
     def do_device(self, arg):
@@ -787,7 +823,7 @@ class IOSCmdLineDev(CmdLine):
             if curint[1].find("SSID") >= 0:
                 i = IOSCmdLineIntSSID()
             elif curint[1].find("Ethernet") >= 0:
-                print("Switch interface configuration not yet implemented.")
+                i = IOSCmdLineIntSwitch()
             else:
                 print("Security appliance interface configuration not yet implemented.")
             # print(arg[0], intlist, curint)
@@ -820,7 +856,7 @@ class IOSCmdLineDev(CmdLine):
 # -------------------
 class IOSCmdLineIntSSID(CmdLine):
     global shortioscmdlistint
-    shortioscmdlistint = ["show", "quit", "end", "name", "shut", "psk"]
+    shortioscmdlistint = ["show", "quit", "end", "name", "shut", "psk", "clear", "accesslist"]
 
     def __init__(self):
         CmdLine.__init__(self)
@@ -871,6 +907,57 @@ class IOSCmdLineIntSSID(CmdLine):
         r = merakiaddon.putssidconfig(merakiaddon.meraki_api_token, curnet[1], "", "", ssid_psk, curint[0], suppressprint=True)
         # print(r)
 
+    def do_accesslist(self, arg):
+        """Set SSID Layer 3 Firewall Rule"""
+        global curint
+        if isinstance(arg, list):
+            ssid_l3fw = arg[0]
+        else:
+            ssid_l3fw = arg
+
+        aclarr = ssid_l3fw.split(" ")
+        # allow protocol udp port 53 dst Any description Test
+        #   0       1     2    3   4  5   6       7        8
+
+        newacl = []
+        if len(aclarr) == 9:
+            r2 = meraki.getssidl3fwrules(merakiaddon.meraki_api_token, curnet[1], curint[0], suppressprint=True)
+            if len(r2) > 2:
+                for rnum in range(0, len(r2) - 2):
+                    newacl.append(r2[rnum])
+
+            newacl.append({"comment": aclarr[8], "policy": aclarr[0], "protocol": aclarr[2], "destPort": aclarr[4], "destCidr": aclarr[6]})
+            a = meraki.updatessidl3fwrules(merakiaddon.meraki_api_token, curnet[1], curint[0], newacl, suppressprint=True)
+        else:
+            print("Please check your access-list syntax and try again.\neg: accesslist allow protocol udp port 53 dst Any description Test")
+
+    def do_clear(self, arg):
+        """Clear specific configurations ['access-list']"""
+        global devlist
+
+        fullcmdlist = [
+            ('access-list', 'clear access-list'),
+        ]
+        shortcmdlist = []
+        for c in fullcmdlist:
+            shortcmdlist.append(c[0])
+
+        self.params = Command(arg[0], fullcmdlist)
+
+        if arg[0]:
+            usedcmd = self.params.closest_match(arg[0], shortcmdlist)
+        else:
+            usedcmd = ""
+
+        if arg[0].find(" ") >= 0:
+            newarg = arg[0][arg[0].find(" ")+1:]
+        else:
+            newarg = ""
+
+        if usedcmd == "access-list":
+            a = meraki.updatessidl3fwrules(merakiaddon.meraki_api_token, curnet[1], curint[0], [], allowlan=True, suppressprint=True)
+
+
     def do_show(self, arg):
         """Show dashboard information ['configuration']"""
         global devlist
@@ -897,6 +984,7 @@ class IOSCmdLineIntSSID(CmdLine):
         if usedcmd == "configuration":
             #print_data(build_devint_list(newarg))
             r = meraki.getssiddetail(merakiaddon.meraki_api_token, curnet[1], curint[0], suppressprint=True)
+            r2 = meraki.getssidl3fwrules(merakiaddon.meraki_api_token, curnet[1], curint[0], suppressprint=True)
             cfg = "interface SSID" + str(r["number"]) + "\n"
             cfg += " name " + r["name"] + "\n"
             if r["enabled"]:
@@ -914,6 +1002,17 @@ class IOSCmdLineIntSSID(CmdLine):
             cfg += " bandSelection " + r["bandSelection"] + "\n"
             cfg += " perClientBandwidthLimitUp " + str(r["perClientBandwidthLimitUp"]) + "\n"
             cfg += " perClientBandwidthLimitDown " + str(r["perClientBandwidthLimitDown"]) + "\n"
+
+            cfg += " access-list l3FirewallRules\n"
+            for rule in r2:
+                thiscom = rule["comment"]
+                thispol = rule["policy"]
+                thispro = rule["protocol"]
+                thispor = rule["destPort"]
+                thisnet = rule["destCidr"]
+
+                cfg += "  " + thispol + " protocol " + thispro + " port " + thispor + " dst " + thisnet + " description " + thiscom + "\n"
+
             print(cfg)
 
     def default(self, arg):
@@ -929,6 +1028,138 @@ class IOSCmdLineIntSSID(CmdLine):
                 getattr(IOSCmdLineIntSSID, 'do_' + usedcmd)(self, [argrest, usingno])
             except Exception as e:
                 print("Command '" + usedcmd + "' not found or not valid in 'SSID interface' context. (" + arg + ")")
+                print(e)
+        else:
+            print("Unknown command: ", usedcmd)
+
+
+# -------------------
+# ---- Interface Context (Switch / Eth port)
+# -------------------
+class IOSCmdLineIntSwitch(CmdLine):
+    global shortioscmdlistintswitch
+    shortioscmdlistintswitch = ["show", "quit", "end", "shut", "tag", "vlan"]
+
+    def __init__(self):
+        CmdLine.__init__(self)
+
+    def do_quit(self, args):
+        """Quits the program."""
+        raise SystemExit
+
+    def do_end(self, args):
+        """Exit contexts and configuration."""
+        i = IOSCmdLine()
+        i.prompt = "#"
+        i.params = Command("show", [])
+        i.cmdloop()
+
+    def do_shut(self, arg):
+        """Disable Interfacee"""
+        global curnet
+        global curint
+
+        if isinstance(arg, list) and arg[1]:
+            # no shut
+            r = meraki.updateswitchport(merakiaddon.meraki_api_token, curdev[1], curint[0], enabled=True, suppressprint=True)
+        else:
+            # shut
+            r = meraki.updateswitchport(merakiaddon.meraki_api_token, curdev[1], curint[0], enabled=False, suppressprint=True)
+        # print(r)
+
+    def do_tag(self, arg):
+        """Set Interface Tag"""
+        global curint
+        if isinstance(arg, list):
+            int_tag = arg[0]
+        else:
+            int_tag = arg
+
+        r = meraki.updateswitchport(merakiaddon.meraki_api_token, curdev[1], curint[0], tags=[int_tag], suppressprint=True)
+        # print(r)
+
+    def do_vlan(self, arg):
+        """Set Interface VLAN"""
+        global curint
+        if isinstance(arg, list):
+            int_vlan = arg[0]
+        else:
+            int_vlan = arg
+
+        r = meraki.updateswitchport(merakiaddon.meraki_api_token, curdev[1], curint[0], vlan=int_vlan, porttype="access", suppressprint=True)
+        # print(r)
+
+    def do_show(self, arg):
+        """Show dashboard information ['configuration']"""
+        global devlist
+
+        fullcmdlist = [
+            ('configuration', 'show configuration'),
+        ]
+        shortcmdlist = []
+        for c in fullcmdlist:
+            shortcmdlist.append(c[0])
+
+        self.params = Command(arg[0], fullcmdlist)
+
+        if arg[0]:
+            usedcmd = self.params.closest_match(arg[0], shortcmdlist)
+        else:
+            usedcmd = ""
+
+        if arg[0].find(" ") >= 0:
+            newarg = arg[0][arg[0].find(" ")+1:]
+        else:
+            newarg = ""
+
+        if usedcmd == "configuration":
+            #print_data(build_devint_list(newarg))
+            r = meraki.getswitchportdetail(merakiaddon.meraki_api_token, curdev[1], curint[0], suppressprint=True)
+            cfg = "interface Ethernet" + str(r["number"]) + "\n"
+            if r["name"]:
+                cfg += " name " + str(r.get("name", "")) + "\n"
+            else:
+                cfg += " no name\n"
+            if r["enabled"]:
+                cfg += " no shut\n"
+            else:
+                cfg += " shut\n"
+            cfg += " tags " + str(r.get("tags", "")) + "\n"
+            if r["poeEnabled"]:
+                cfg += " power inline\n"
+            else:
+                cfg += " power inline never\n"
+            if r["type"] == "trunk":
+                cfg += " switchport mode trunk\n"
+                cfg += " switchport trunk allowed vlans " + str(r["allowedVlans"]) + "\n"
+            else:
+                cfg += " switchport mode access\n"
+                cfg += " switchport access vlan " + str(r["vlan"]) + "\n"
+                if r["voiceVlan"]:
+                    cfg += " switchport voice vlan " + str(r["voiceVlan"]) + "\n"
+                else:
+                    cfg += " no switchport voice vlan\n"
+
+            cfg += " isolationEnabled " + str(r["isolationEnabled"]) + "\n"
+            cfg += " rstpEnabled " + str(r["rstpEnabled"]) + "\n"
+            cfg += " stpGuard " + r["stpGuard"] + "\n"
+            cfg += " accessPolicyNumber " + str(r.get("accessPolicyNumber", "")) + "\n"
+            cfg += " linkNegotiation " + str(r["linkNegotiation"]) + "\n"
+            print(cfg)
+
+    def default(self, arg):
+        usingno = False
+        if arg[0:2].lower() == "no":
+            usingno = True
+            arg = arg[2:].strip()
+        global shortioscmdlistintswitch
+        usedcmd = self.params.closest_match(arg, shortioscmdlistintswitch)
+        argrest = arg[arg.find(" ")+1:]
+        if usedcmd:
+            try:
+                getattr(IOSCmdLineIntSwitch, 'do_' + usedcmd)(self, [argrest, usingno])
+            except Exception as e:
+                print("Command '" + usedcmd + "' not found or not valid in 'switch interface' context. (" + arg + ")")
                 print(e)
         else:
             print("Unknown command: ", usedcmd)

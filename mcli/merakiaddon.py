@@ -485,6 +485,66 @@ def getwirelessstats(apikey, networkid, serial, suppressprint=False):
     return result
 
 
+# Add HTTP Server
+# https://n27.meraki.com/Switch-Test/n/KzYbidB/manage/support/api_docs#http-servers
+def addhttpserver(apikey, networkid, url, suppressprint=False):
+    base_url = 'https://api.meraki.com/api/v0'
+    calltype = 'Webhook HTTP Servers'
+    geturl = '{0}/networks/{1}/httpServers'.format(str(base_url), str(networkid))
+    headers = {
+        'x-cisco-meraki-api-key': format(str(apikey)),
+        'Content-Type': 'application/json'
+    }
+    data = {"name": "Webhook", "url": url, "sharedSecret": ""}
+    dashboard = requests.post(geturl, data=json.dumps(data), headers=headers)
+    result = meraki.__returnhandler(dashboard.status_code, dashboard.text, calltype, suppressprint)
+    return result
+
+# Set HTTP Server As Default Destination
+# https://n81.meraki.com/Pod-1/n/XLDp8drb/manage/support/api_docs#return-the-alert-configuration-for-this-network
+def sethttpserverdefaultalert(apikey, networkid, whid, suppressprint=False):
+    base_url = 'https://api.meraki.com/api/v0'
+    calltype = 'Webhook HTTP Servers Alert Settings'
+    geturl = '{0}/networks/{1}/alertSettings'.format(str(base_url), str(networkid))
+    headers = {
+        'x-cisco-meraki-api-key': format(str(apikey)),
+        'Content-Type': 'application/json'
+    }
+    data = {"defaultDestinations": {"httpServerIds": [whid]}}
+    dashboard = requests.put(geturl, data=json.dumps(data), headers=headers)
+    result = meraki.__returnhandler(dashboard.status_code, dashboard.text, calltype, suppressprint)
+    return result
+
+# Enable specific alert
+# https://n81.meraki.com/Pod-1/n/XLDp8drb/manage/support/api_docs#return-the-alert-configuration-for-this-network
+def setalertstatus(apikey, networkid, alert_type, suppressprint=False):
+    base_url = 'https://api.meraki.com/api/v0'
+    calltype = 'Alert Settings Configuration'
+    geturl = '{0}/networks/{1}/alertSettings'.format(str(base_url), str(networkid))
+    headers = {
+        'x-cisco-meraki-api-key': format(str(apikey)),
+        'Content-Type': 'application/json'
+    }
+    data = {"alerts": [{"type": alert_type, "enabled": True}]}
+    dashboard = requests.put(geturl, data=json.dumps(data), headers=headers)
+    result = meraki.__returnhandler(dashboard.status_code, dashboard.text, calltype, suppressprint)
+    return result
+
+# Get HTTP Server
+# https://n27.meraki.com/Switch-Test/n/KzYbidB/manage/support/api_docs#http-servers
+def gethttpservers(apikey, networkid, suppressprint=False):
+    base_url = 'https://api.meraki.com/api/v0'
+    calltype = 'Get Webhook HTTP Servers'
+    geturl = '{0}/networks/{1}/httpServers'.format(str(base_url), str(networkid))
+    headers = {
+        'x-cisco-meraki-api-key': format(str(apikey)),
+        'Content-Type': 'application/json'
+    }
+    dashboard = requests.get(geturl, headers=headers)
+    result = meraki.__returnhandler(dashboard.status_code, dashboard.text, calltype, suppressprint)
+    return result
+
+
 # SSID Enable / Disable
 # https://n27.meraki.com/abc123/n/S6QQbbB/manage/support/api_docs#update-the-attributes-of-an-ssid
 def putssidconfig(apikey, networkid, status, name, psk, ssidnum, suppressprint=False):
