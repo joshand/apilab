@@ -1,9 +1,9 @@
-#! /bin/bash
+#!/bin/bash
 
 HEADER_CONTENT_TYPE="Content-Type: application/json"
 HEADER_ACCEPT="Accept: application/json"
-API_KEY="X-Cisco-Meraki-API-Key: dc440e9ebf03a0935469cb586952c0448234d9d3"
-BASE_URL="https://dashboard.meraki.com/api/v0"
+API_KEY="X-Cisco-Meraki-API-Key: 1234567890abcdefghijklmnopqrstuvwxyz1234"
+BASE_URL="https://api.meraki.com/api/v0"
 COMM_FILE="/tmp/rest.json"
 CURL_FILE="/tmp/curl.out"
 
@@ -16,6 +16,11 @@ function callGETService {
     fi
 
     echo "Calling URI (GET):" ${uri}
+#    echo ${API_KEY}
+#    echo ${HEADER_ACCEPT}
+#    echo ${HEADER_CONTENT_TYPE}
+#    echo ${BASE_URL}
+#    echo ${uri}
     curl -L -X GET -H "${API_KEY}" -H "${HEADER_ACCEPT}" -H "${HEADER_CONTENT_TYPE}" "${BASE_URL}${uri}" --output "${COMM_FILE}" 2> /dev/null > "${COMM_FILE}"
 }
 
@@ -60,6 +65,10 @@ function getHelp {
 	echo "     getdevs"
 	echo "          Returns a list of Devices configured in the provided Network."
 	echo "          Used together with -N, --network"
+	echo ""
+	echo "     gethealth"
+	echo "          Returns the wireless health data for the provided network."
+	echo "          Used together with -N, --network and -T, --timespan"
 	echo ""
 	echo "     newnet <\"network name\">"
 	echo "          Create a new network in a given Organization."
@@ -110,6 +119,9 @@ function getHelp {
 	echo "     -R, --port"
 	echo "          Specify the Port to use when configuring a switch port."
 	echo ""
+	echo "     -T, --timespan"
+	echo "          Specify the time duration (in hours) for the given operation."
+	echo ""
 }
 
 # get all organizations
@@ -125,11 +137,11 @@ function getOrgs {
 		# add quotes to org json
 		orgjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
 		# parse json to get id and name
-		orgid=$( echo $orgjson | grep -o '"id": *"[^"]*"' | grep -o '"[^"]*"$' )
-		orgname=$( echo $orgjson | grep -o '"name": *"[^"]*"' | grep -o '"[^"]*"$' )
-		echo "*" $orgid $orgname
+		orgid=$( echo $orgjson | grep -o '"id": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+		orgname=$( echo $orgjson | grep -o '"name": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+		echo "* $orgid - $orgname"
 	done
-	
+
 	unset IFS
 }
 
@@ -146,11 +158,11 @@ function getNets {
 		# add quotes to net json
 		netjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
 		# parse json to get id and name
-		netid=$( echo $netjson | grep -o '"id": *"[^"]*"' | grep -o '"[^"]*"$' )
-		netname=$( echo $netjson | grep -o '"name": *"[^"]*"' | grep -o '"[^"]*"$' )
-		echo "*" $netid $netname
+		netid=$( echo $netjson | grep -o '"id": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+		netname=$( echo $netjson | grep -o '"name": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+		echo "* $netid - $netname"
 	done
-	
+
 	unset IFS
 }
 
@@ -167,12 +179,12 @@ function getDevs {
 		# add quotes to dev json
 		devjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
 		# parse json to get id and name
-		devsn=$( echo $devjson | grep -o '"serial": *"[^"]*"' | grep -o '"[^"]*"$' )
-		devmodel=$( echo $devjson | grep -o '"model": *"[^"]*"' | grep -o '"[^"]*"$' )
-		devmac=$( echo $devjson | grep -o '"mac": *"[^"]*"' | grep -o '"[^"]*"$' )
-		echo "*" $devsn $devmodel $devmac
+		devsn=$( echo $devjson | grep -o '"serial": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+		devmodel=$( echo $devjson | grep -o '"model": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+		devmac=$( echo $devjson | grep -o '"mac": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+		echo "* $devsn - $devmodel - $devmac"
 	done
-	
+
 	unset IFS
 }
 
@@ -267,7 +279,7 @@ function setPortTag {
 	local tags=$2
 	local json='{"tags": "'${tags}'"}'
     callPUTService "/devices/$1/switchPorts/$3" "${json}"
-    
+
     local x=`cat $COMM_FILE`
 	# add quotes to net json
 	devjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
@@ -287,7 +299,7 @@ function setPortVlan {
 	local vlan=$2
 	local json='{"type": "access", "voiceVlan": "", "vlan": "'${vlan}'"}'
     callPUTService "/devices/$1/switchPorts/$3" "${json}"
-    
+
     local x=`cat $COMM_FILE`
 	# add quotes to net json
 	devjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
@@ -308,7 +320,7 @@ function setSsid {
 	local psk=$3
 	local json='{"name": "'${name}'", "enabled": true, "authMode": "psk", "encryptionMode": "wpa", "wpaEncryptionMode": "WPA2 only", "psk": "'${psk}'"}'
     callPUTService "/networks/$1/ssids/0" "${json}"
-    
+
     local x=`cat $COMM_FILE`
 	# add quotes to net json
 	ssidjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
@@ -330,7 +342,7 @@ function setSsid {
 function setSsidDns {
 	local json='{"rules": [{"comment": "Allow Umbrella DNS", "policy": "allow", "protocol": "udp", "destPort": "53", "destCidr": "208.67.222.222/32"}, {"comment": "Allow Umbrella DNS", "policy": "allow", "protocol": "udp", "destPort": "53", "destCidr": "208.67.220.220/32"}, {"comment": "Block Other DNS", "policy": "deny", "protocol": "udp", "destPort": "53", "destCidr": "any"}]}'
     callPUTService "/networks/$1/ssids/0/l3FirewallRules" "${json}"
-    
+
     local x=`cat $COMM_FILE`
 	# add quotes to net json
 	devjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
@@ -343,6 +355,71 @@ function setSsidDns {
     else
 		echo "DNS Restrictions set on SSID."
 	fi
+}
+
+# get wireless health
+function getWirelessHealth {
+	tsend=$(date +%s)
+	offset="$((3600*$2))"
+	tsstr="$(($tsend-offset))"
+    callGETService "/networks/$1/connectionStats?t0=$tsstr&t1=$tsend"
+
+	local c=`cat $COMM_FILE`
+	IFS='%'
+	arr=$(echo $c | sed 's/},{/}%{/g' | tr -d "[]")
+
+	for x in $arr
+	do
+		# add quotes to dev json
+		devjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
+		# parse json to get id and name
+		devassoc=$( echo $devjson | grep -o '"assoc": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+		devauth=$( echo $devjson | grep -o '"auth": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+		devdhcp=$( echo $devjson | grep -o '"dhcp": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+		devdns=$( echo $devjson | grep -o '"dns": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+		devsuccess=$( echo $devjson | grep -o '"success": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+		total="$((devassoc+devauth+devdhcp+devdns+devsuccess))"
+		ftotal="$((devassoc+devauth+devdhcp+devdns))"
+        echo "Wireless Health Information"
+        echo "(Last $2 Hours)"
+        echo "---------------------------"
+        echo "     Total Connections: $total"
+        echo "  Association Failures: $devassoc"
+        echo "Authorization Failures: $devauth"
+        echo "         DHCP Failures: $devdhcp"
+        echo "          DNS Failures: $devdns"
+        echo "                      ------"
+        echo "    Failed Connections: $ftotal"
+        echo "Successful Connections: $devsuccess"
+        echo ""
+	done
+	unset IFS
+
+    callGETService "/networks/$1/failedConnections?t0=$tsstr&t1=$tsend"
+
+	local c=`cat $COMM_FILE`
+	IFS='%'
+	arr=$(echo $c | sed 's/},{/}%{/g' | tr -d "[]")
+
+    count=0
+    echo "Last 10 Failures"
+    echo "---------------------------"
+	for x in $arr
+	do
+		# add quotes to dev json
+		devjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
+		mac=$( echo $devjson | grep -o '"clientMac": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+		step=$( echo $devjson | grep -o '"failureStep": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+		ap=$( echo $devjson | grep -o '"serial": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+		type=$( echo $devjson | grep -o '"type": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+		vlan=$( echo $devjson | grep -o '"vlan": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+		ts=$( echo $devjson | grep -o '"ts": *[^"]*\.' | grep -o '[^:]*\.$' | sed 's/\.//g')
+		curtime=$(date -r $ts)
+		ssidnum=$( echo $devjson | grep -o '"ssidNumber": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+        echo "* Client $mac failed at $curtime. Cause: $type ($step)."
+        ((count++));if [[ count -eq 10 ]];then break;fi
+    done
+	unset IFS
 }
 
 if [ $# -eq 0 ]
@@ -382,6 +459,11 @@ if [ $# -eq 0 ]
           shift # past argument
           shift # past value
           ;;
+          -T|--timespan)
+          TIMESPAN="$2"
+          shift # past argument
+          shift # past value
+          ;;
           -?|--help)
 		  getHelp
 		  shift
@@ -403,7 +485,7 @@ if [ $# -eq 0 ]
 #     echo DEVICE          = "${DEVICE}"
 #     echo PSK             = "${PSK}"
 # 	echo ""
-  
+
     case $1 in
     	getorgs)
 		    getOrgs
@@ -413,6 +495,9 @@ if [ $# -eq 0 ]
 		    ;;
     	getdevs)
 		    getDevs "${NETWORK}"
+		    ;;
+    	gethealth)
+		    getWirelessHealth "${NETWORK}" "${TIMESPAN}"
 		    ;;
     	newnet)
 		    newNet "${ORGANIZATION}" "$2"

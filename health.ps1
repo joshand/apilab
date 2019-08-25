@@ -9,6 +9,7 @@ Param (
     [switch] $getorgs = $false,
     [switch] $getnets = $false,
     [switch] $getdevs = $false,
+    [switch] $gethealth = $false,
     [string] $newnet = $false,
     [string] $newdev = $false,
     [string] $newwhd = $false,
@@ -17,6 +18,7 @@ Param (
     [switch] $setssiddns = $false,
     [string] $setporttag = $false,
     [string] $setportvlan = $false,
+    [string] $timespan = $false,
     [switch] $help = $false
 )
 
@@ -24,7 +26,7 @@ New-Variable -Scope global -Name headers
 $global:headers = @{
 	"Content-Type" = "application/json"
 	"Accept" = "application/json"
-	"X-Cisco-Meraki-API-Key" = "dc440e9ebf03a0935469cb586952c0448234d9d3"
+	"X-Cisco-Meraki-API-Key" = "1234567890abcdefghijklmnopqrstuvwxyz1234"
 }
 New-Variable -Scope global -Name base_url
 $global:base_url = "https://api.meraki.com/api/v0"
@@ -43,6 +45,10 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
 $AllProtocols = [System.Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12'
 [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+
+Function Convert-FromUnixDate ($UnixDate) {
+   [timezone]::CurrentTimeZone.ToLocalTime(([datetime]'1/1/1970').AddSeconds($UnixDate))
+}
 
 function callGETService {
 	$uri = $global:base_url + $args[0];
@@ -70,7 +76,7 @@ function callPOSTService {
 			"statusmsg" = $_.Exception.Response.StatusDescription
 		}
 		$response = $ret
-	} 
+	}
 	return $response
 }
 
@@ -175,7 +181,7 @@ function getOrgs {
 
 	Foreach ($x in $res)
 	{
-		Write-Host '*' $x.id '"'$x.name'"'
+		Write-Host "* $($x.id) - $($x.name)"
 	}
 }
 
@@ -186,7 +192,7 @@ function getNets {
 
 	Foreach ($x in $res)
 	{
-		Write-Host '*' $x.id '"'$x.name'"'
+		Write-Host "* $($x.id) - $($x.name)"
 	}
 }
 
@@ -197,7 +203,7 @@ function getDevs {
 
 	Foreach ($x in $res)
 	{
-		Write-Host '*' $x.serial '"'$x.model'"' '"'$x.mac'"'
+		Write-Host "* $($x.serial) - $($x.model) - $($x.mac)"
 	}
 }
 
@@ -408,6 +414,72 @@ function setPortVlan {
 	}
 }
 
+# get wireless health
+function getWirelessHealth {
+	$tsend = [int64](([datetime]::UtcNow)-(get-date "1/1/1970")).TotalSeconds
+	$offset = 3600 * $args[1]
+	$tsstr = $tsend - $offset
+
+	$uri = '/networks/' + $args[0] + '/connectionStats?t0=' + $tsstr + '&t1=' + $tsend
+	$res = callGETService $uri;
+	$total = $res.assoc + $res.auth + $res.dhcp + $res.dns + $res.success
+	$ftotal = $res.assoc + $res.auth + $res.dhcp + $res.dns
+	Write-Host "Wireless Health Information"
+	Write-Host "(Last $($args[1]) Hours)"
+	Write-Host "---------------------------"
+	Write-Host "     Total Connections: $($total)"
+	Write-Host "  Association Failures: $($res.assoc)"
+	Write-Host "Authorization Failures: $($res.auth)"
+	Write-Host "         DHCP Failures: $($res.dhcp)"
+	Write-Host "          DNS Failures: $($res.dns)"
+	Write-Host "                      ------"
+	Write-Host "    Failed Connections: $($ftotal)"
+	Write-Host "Successful Connections: $($res.success)"
+	Write-Host ""
+
+	$uri = '/networks/' + $args[0] + '/failedConnections?t0=' + $tsstr + '&t1=' + $tsend
+	$res = callGETService $uri;
+	$count = 0
+    Write-Host "Last 10 Failures"
+    Write-Host "---------------------------"
+	Foreach ($x in $res)
+	{
+		$curtime = Convert-FromUnixDate $x.ts
+		Write-Host "* Client $($x.clientMac) failed at $($curtime). Cause: $($x.type) ($($x.failureStep))"
+		$count++
+		if ($count -eq 10) {
+			break
+		}
+	}
+
+
+
+	#
+#	local c=`cat $COMM_FILE`
+#	IFS='%'
+#	arr=$(echo $c | sed 's/},{/}%{/g' | tr -d "[]")
+#
+#    count=0
+#    echo "Last 10 Failures"
+#    echo "---------------------------"
+#	for x in $arr
+#	do
+#        ((count++));if [[ count -eq 10 ]];then break;fi
+#		# add quotes to dev json
+#		devjson=$( echo $x | sed 's/:\([0-9]*\)\([,}]\)/:"\1"\2/g' )
+#		mac=$( echo $devjson | grep -o '"clientMac": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+#		step=$( echo $devjson | grep -o '"failureStep": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+#		ap=$( echo $devjson | grep -o '"serial": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+#		type=$( echo $devjson | grep -o '"type": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+#		vlan=$( echo $devjson | grep -o '"vlan": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+#		ts=$( echo $devjson | grep -o '"ts": *[^"]*\.' | grep -o '[^:]*\.$' | sed 's/\.//g')
+#		curtime=$(date -r $ts)
+#		ssidnum=$( echo $devjson | grep -o '"ssidNumber": *"[^"]*"' | grep -o '"[^"]*"$' | sed 's/"//g')
+#        echo "* Client $mac failed at $curtime. Cause: $type ($step)."
+#    done
+#	unset IFS
+}
+
 If ($help -eq $true) {
 	getHelp
 } ElseIf ($getorgs -eq $true) {
@@ -416,6 +488,8 @@ If ($help -eq $true) {
 	getNets $organization
 } ElseIf ($getdevs -eq $true) {
 	getDevs $network
+} ElseIf ($gethealth -eq $true) {
+	getWirelessHealth $network $timespan
 } ElseIf ($newnet -ne $false) {
 	newNet $newnet $organization
 } ElseIf ($newdev -ne $false) {
@@ -432,4 +506,6 @@ If ($help -eq $true) {
 	setPortTag $setporttag $device $port
 } ElseIf ($setportvlan -ne $false) {
 	setPortVlan $setportvlan $device $port
+} Else {
+	getHelp
 }
